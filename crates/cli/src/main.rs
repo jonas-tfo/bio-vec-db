@@ -1,6 +1,5 @@
 use ml_models::python_embedder::PythonEmbedder;
-use core_db::types::VectorDBConfig;
-use core_db::types::VectorDB;
+use core_db::types::{VectorDBConfig, VectorDB, FastaRecord, SeqType};
 use std::path::PathBuf;
 
 fn main() -> anyhow::Result<()> {
@@ -12,7 +11,22 @@ fn main() -> anyhow::Result<()> {
 
     let config = VectorDBConfig::default(PathBuf::from("data/db"));
 
-    let db = VectorDB::open(config, Box::new(embedder as PythonEmbedder))?;
+    let mut db = VectorDB::open(config, Box::new(embedder as PythonEmbedder))?;
+    db.clear()?;
+
+    // insert test records
+    let test_seqs = [
+        ("seq1", b"MKTAYIAKQRQISFVKSHFSRQ" as &[u8]),
+        ("seq2", b"ACDEFGHIKLMNPQRSTVWY"),
+        ("seq3", b"KALTARQQEVFDLIRDHISQTGMPPTRAEIAQDFK"),
+    ];
+    for (header, seq) in &test_seqs {
+        db.insert(FastaRecord {
+            header: header.to_string(),
+            sequence: seq.to_vec(),
+            seq_type: SeqType::Protein,
+        })?;
+    }
 
     // test search
     let query = b"MKTAYIAKQRQISFVKSHFSRQ";
