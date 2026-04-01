@@ -14,7 +14,7 @@ mod tests {
             seq_type: SeqType::Dna
         };
         let internal_id = storage.insert(&record).unwrap();
-        let retrieved = storage.get(internal_id).unwrap().unwrap();
+        let retrieved = storage.get(internal_id, SeqType::Dna).unwrap().unwrap();
 
         assert_eq!(record.header, retrieved.header);
         assert_eq!(record.sequence, retrieved.sequence);
@@ -63,7 +63,7 @@ mod tests {
         {
             // db reopened
             let storage = Storage::open(temp.path()).unwrap();
-            let retrieved = storage.get(id).unwrap().unwrap();
+            let retrieved = storage.get(id, SeqType::Protein).unwrap().unwrap();
 
             assert_eq!(record.header, retrieved.header);
             assert_eq!(record.sequence, retrieved.sequence);
