@@ -3,7 +3,9 @@ use anyhow::{Context, Ok, Result};
 use std::path::PathBuf;
 use hnsw_rs::hnsw::Neighbour;
 use hnsw_rs::prelude::{Hnsw, DistL2};
+use crate::SeqType;
 use crate::types::{Storage, FastaRecord, HnswSearchQuery, SequenceEmbedder, VectorDB, VectorDBConfig};
+use crate::fileutils::parse_fasta;
 
 
 impl VectorDBConfig {
@@ -15,6 +17,7 @@ impl VectorDBConfig {
             expected_size: 100_000,
             ef_search: 50,
             max_layers: 16,
+            record_type: SeqType::Protein
         }
     }
 }
@@ -45,17 +48,34 @@ impl VectorDB {
         Ok(db)
     }
 
+    /// fill database from a fasta file
+    fn rebuild_index_from_fasta(&mut self, fasta: &str) -> Result<()> {
+        let (ids, seqs, seq_type) = parse_fasta(fasta)?;
+        for (id, seq) in ids.iter().zip(seqs.iter()) {
+            let record = FastaRecord {
+                header: id.to_string(),
+                sequence: seq.clone().into_bytes(),
+                seq_type: seq_type
+            };
+            self.insert(record)?;
+        }
+        Ok(())
+    }
+
+    /// embed all sequences in given sled db
     fn rebuild_index(&mut self) -> Result<()> {
         let mut count = 0;
-        for entry in self.sled_storage.iter() {
-            let (internal_id, record) = entry
-                .context("failed to read record during index rebuild")?;
+        for seq_type in [SeqType::Dna, SeqType::Rna, SeqType::Protein] {
+            for entry in self.sled_storage.iter(seq_type) {
+                let (internal_id, record) = entry
+                    .context("failed to read record during index rebuild")?;
 
-            let embedding = self.embedder.embed(&record.sequence)
-                .context("failed to embed sequence during rebuild")?;
+                let embedding = self.embedder.embed_dev(&record.sequence)
+                    .context("failed to embed sequence during rebuild")?;
 
-            self.hnsw_storage.insert((&embedding, internal_id as usize));
-            count += 1;
+                self.hnsw_storage.insert((&embedding, internal_id as usize));
+                count += 1;
+            }
         }
         if count > 0 {
             println!("rebuilt HNSW index from {} records", count);
@@ -65,7 +85,7 @@ impl VectorDB {
 
     /// store in sled, embed sequence, store in vector db
     pub fn insert(&mut self, record: FastaRecord) -> Result<u64> {
-        let embedding: Vec<f32> = self.embedder.embed(&record.sequence).context("Failed to embed the sequence")?;
+        let embedding: Vec<f32> = self.embedder.embed_dev(&record.sequence).context("Failed to embed the sequence")?;
         let internal_id = self.sled_storage.insert(&record).context("Failed to insert record into db")?;
         self.hnsw_storage.insert((&embedding, internal_id as usize));
         Ok(internal_id)
@@ -77,15 +97,20 @@ impl VectorDB {
 
     /// get kNN and give nearest records and their l2 distance to query
     pub fn search(&self, query: HnswSearchQuery) -> Result<Vec<Neighbour>> {
-        let embedding: Vec<f32> = self.embedder.embed(&query.data)
+        let embedding: Vec<f32> = self.embedder.embed_dev(&query.data)
             .context("Failed to embed the sequence")?;
         let neighbours: Vec<Neighbour> = self.hnsw_storage.search(&embedding, query.knn, query.search_width);
         Ok(neighbours)
     }
 
     /// remove from sled, cant remove from hnsw though, always dead vector?
-    pub fn delete(&mut self, internal_id: u64) -> Result<()> {
-        self.sled_storage.delete(internal_id)?;
+    pub fn delete(&mut self, internal_id: u64, seq_type: SeqType) -> Result<()> {
+        self.sled_storage.delete(internal_id, seq_type)?;
+        Ok(())
+    }
+
+    pub fn clear(&mut self) -> Result<()> {
+        self.sled_storage.db.clear()?;
         Ok(())
     }
 
@@ -93,5 +118,6 @@ impl VectorDB {
     pub fn save_index(&self) -> Result<()> {
         todo!()
     }
+
 
 }

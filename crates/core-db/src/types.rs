@@ -13,6 +13,7 @@ pub struct ModelSignature {
 
 pub trait SequenceEmbedder {
     fn embed(&self, sequence: &[u8]) -> Result<Vec<f32>>;
+    fn embed_dev(&self, sequence: &[u8]) -> Result<Vec<f32>>;
     fn embed_batch(&self, sequences: &[&[u8]]) -> Result<Vec<Vec<f32>>>;
     fn get_dimension(&self) -> usize;
     fn get_signature(&self) -> ModelSignature;
@@ -36,7 +37,9 @@ pub struct FastaRecord {
 
 pub struct Storage {
     pub db: sled::Db,
-    pub records: sled::Tree,  // tree for FastaRecord entries
+    pub dna_records: sled::Tree,  // tree for FastaRecord entries
+    pub rna_records: sled::Tree,
+    pub protein_records: sled::Tree,
 }
 
 pub struct VectorDBConfig {
@@ -46,6 +49,7 @@ pub struct VectorDBConfig {
     pub expected_size: usize,    // rough upper bound number of sequences
     pub ef_search: usize,        // search accuracy
     pub max_layers: usize,       // hnsw layer count
+    pub record_type: SeqType,
 }
 
 pub struct VectorDB {

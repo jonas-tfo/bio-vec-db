@@ -2,27 +2,40 @@
 use std::path::Path;
 use anyhow::Ok;
 use anyhow::{Result, Context};
+use crate::SeqType;
 use crate::types::Storage;
 use crate::types::FastaRecord;
 
 impl Storage {
     pub fn open(path: &Path) -> Result<Self> {
         let db: sled::Db = sled::open(path)?;
-        let records = db.open_tree("records")?; // creates or opens table in db
-        Ok(Self {db: db, records: records})
+        Ok(Self {
+            dna_records: db.open_tree("dna")?,
+            rna_records: db.open_tree("rna")?,
+            protein_records: db.open_tree("protein")?,
+            db,
+        })
+    }
+
+    pub fn get_tree_type(&self, seq_type: SeqType) -> &sled::Tree {
+        match seq_type {
+            SeqType::Dna => &self.dna_records,
+            SeqType::Rna => &self.rna_records,
+            SeqType::Protein => &self.protein_records
+        }
     }
 
     pub fn insert(&self, record: &FastaRecord) -> Result<u64> {
         let id = self.db.generate_id()?;
         let id_ser: [u8;_] = id.to_be_bytes(); // big endian because keys stored sorted
         let record_ser: Vec<u8> = bincode::serialize(&record)?;
-        self.records.insert(id_ser, record_ser)?;
+        self.get_tree_type(record.seq_type).insert(id_ser, record_ser)?;
         Ok(id)
     }
 
-    pub fn get(&self, internal_id: u64) -> Result<Option<FastaRecord>> {
+    pub fn get(&self, internal_id: u64, seq_type: SeqType) -> Result<Option<FastaRecord>> {
         let id_be = internal_id.to_be_bytes();
-        let record_ser = self.records.get(id_be)?;
+        let record_ser = self.get_tree_type(seq_type).get(id_be)?;
         match record_ser {
             None => Ok(None),
             Some(bytes) => {
@@ -31,9 +44,9 @@ impl Storage {
         }
     }
 
-    pub fn delete(&self, internal_id: u64) -> Result<()> {
+    pub fn delete(&self, internal_id: u64, seq_type: SeqType) -> Result<()> {
         let id_be = internal_id.to_be_bytes();
-        let deleted_val = self.records.remove(id_be)?;
+        let deleted_val = self.get_tree_type(seq_type).remove(id_be)?;
         match deleted_val {
             None => {
                 eprintln!("warning: no record found for id {}", internal_id);
@@ -43,8 +56,8 @@ impl Storage {
         Ok(())
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = Result<(u64, FastaRecord)>> + '_ {
-        self.records.iter().map(|item| {
+    pub fn iter(&self, seq_type: SeqType) -> impl Iterator<Item = Result<(u64, FastaRecord)>> + '_ {
+        self.get_tree_type(seq_type).iter().map(|item| {
             let (key, value) = item.context("failed to read from sled")?;
 
             let internal_id = u64::from_be_bytes(
