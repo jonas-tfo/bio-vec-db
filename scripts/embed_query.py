@@ -8,6 +8,23 @@ T5_MODEL   = "Rostlab/prot_t5_xl_half_uniref50-enc"
 BERT_MODEL = "Rostlab/prot_bert"
 
 
+def parse_fasta(path: str) -> list[str]:
+    sequences = []
+    current = []
+    with open(path) as f:
+        for line in f:
+            line = line.strip()
+            if line.startswith(">"):
+                if current:
+                    sequences.append("".join(current))
+                    current = []
+            else:
+                current.append(line)
+    if current:
+        sequences.append("".join(current))
+    return sequences
+
+
 def embed_sequence_t5(sequence: str, tokenizer, encoder, device: str) -> list[float]:
     seq_spaced = " ".join(list(sequence))
     tokenized = tokenizer(
@@ -29,6 +46,13 @@ def embed_sequence_t5(sequence: str, tokenizer, encoder, device: str) -> list[fl
     embeddings = embeddings.squeeze(0)[:seq_len]  # (seq_len, hidden_dim)
     pooled = embeddings.mean(dim=0)               # (hidden_dim,)
     return pooled.float().cpu().tolist()
+
+def embed_sequence_t5_batch(sequences, tokenizer, encoder, device) -> list[list[float]]:
+    embeddings = []
+    for sequence in sequences:
+        embedding = embed_sequence_t5(sequence, tokenizer, encoder, device)
+        embeddings.append(embedding)
+    return embeddings
 
 
 def embed_sequence_bert(sequence: str, tokenizer, encoder, device: str) -> list[float]:
@@ -52,10 +76,18 @@ def embed_sequence_bert(sequence: str, tokenizer, encoder, device: str) -> list[
     pooled = embeddings.mean(dim=0)           # (hidden_dim,)
     return pooled.float().cpu().tolist()
 
+def embed_sequence_bert_batch(sequences, tokenizer, encoder, device) -> list[list[float]]:
+    embeddings = []
+    for sequence in sequences:
+        embedding = embed_sequence_bert(sequence, tokenizer, encoder, device)
+        embeddings.append(embedding)
+    return embeddings
+
 
 def main():
     parser = argparse.ArgumentParser(description="Embed a protein sequence")
-    parser.add_argument("--sequence", required=True, help="amino acid sequence")
+    parser.add_argument("--sequence", default=None, help="amino acid sequence to embed")
+    parser.add_argument("--fasta", default=None, help="fasta containing amino acid sequences to embed")
     parser.add_argument("--model",    default=None,  help="huggingface model name (overrides arch default)")
     parser.add_argument("--arch",     default="bert", choices=["t5", "bert"], help="model architecture")
     parser.add_argument("--device",   default=None,  help="cpu, cuda, or mps")
@@ -70,23 +102,35 @@ def main():
     else:
         device = args.device
 
+    if args.sequence is None and args.fasta is None:
+        print("error: provide --sequence or --fasta", file=sys.stderr)
+        sys.exit(1)
+
     if args.arch == "bert":
         model_name = args.model or BERT_MODEL
         tokenizer  = BertTokenizer.from_pretrained(model_name, do_lower_case=False)
         encoder    = BertModel.from_pretrained(model_name)
         encoder.to(device)
         encoder.eval()
-        embedding = embed_sequence_bert(args.sequence, tokenizer, encoder, device)
+        if args.fasta:
+            sequences = parse_fasta(args.fasta)
+            result = embed_sequence_bert_batch(sequences, tokenizer, encoder, device)
+        else:
+            result = embed_sequence_bert(args.sequence, tokenizer, encoder, device)
     else:
         model_name = args.model or T5_MODEL
         tokenizer  = T5Tokenizer.from_pretrained(model_name, do_lower_case=False)
         encoder    = T5EncoderModel.from_pretrained(model_name, torch_dtype=torch.float16)
         encoder.to(device)
         encoder.eval()
-        embedding = embed_sequence_t5(args.sequence, tokenizer, encoder, device)
+        if args.fasta:
+            sequences = parse_fasta(args.fasta)
+            result = embed_sequence_t5_batch(sequences, tokenizer, encoder, device)
+        else:
+            result = embed_sequence_t5(args.sequence, tokenizer, encoder, device)
 
-    # json to stdout for rust
-    json.dump(embedding, sys.stdout)
+    # single sequence -> flat list (Vec<f32>), batch -> nested list (Vec<Vec<f32>>)
+    json.dump(result, sys.stdout)
 
 
 if __name__ == "__main__":
