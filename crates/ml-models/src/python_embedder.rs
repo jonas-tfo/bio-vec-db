@@ -62,8 +62,22 @@ impl SequenceEmbedder for PythonEmbedder {
         Ok(nums)
     }
 
-    fn embed_batch(&self, sequences: &[&[u8]]) -> Result<Vec<Vec<f32>>> {
-        todo!()
+    fn embed_batch(&self, fasta: &PathBuf) -> Result<Vec<Vec<f32>>> {
+        let output = Command::new("python3")
+            .arg(&self.script_path)
+            .arg("--fasta").arg(fasta.to_str().context("invalid path")?)
+            .arg("--model").arg(&self.model_name)
+            .output()
+            .context("failed to run python embedder")?;
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            bail!("python embedder failed: {}", stderr);
+        }
+        let stdout = String::from_utf8(output.stdout)
+            .context("python output was not valid utf-8")?;
+        let embeddings: Vec<Vec<f32>> = serde_json::from_str(&stdout)
+            .context("failed to parse embedding from python output")?;
+        Ok(embeddings)
     }
 
     fn get_dimension(&self) -> usize {
