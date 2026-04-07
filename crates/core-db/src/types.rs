@@ -51,7 +51,7 @@ pub struct Storage {
     pub protein_records: sled::Tree,
 }
 
-pub struct VectorDBConfig {
+pub struct HnswDBConfig {
     pub path: PathBuf,
     pub ef_construction: usize,  // build accuracy
     pub max_nb_connection: usize,// graph connectivity
@@ -61,11 +61,11 @@ pub struct VectorDBConfig {
     pub record_type: SeqType,
 }
 
-pub struct VectorDB {
+pub struct HnswDB {
     pub sled_storage: Storage,
     pub hnsw_storage: Hnsw<'static, f32, DistL2>,
     pub embedder: Box<dyn SequenceEmbedder>,
-    pub config: VectorDBConfig
+    pub config: HnswDBConfig
 }
 
 // data cant outlive search query

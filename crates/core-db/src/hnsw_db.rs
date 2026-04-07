@@ -4,11 +4,11 @@ use std::path::PathBuf;
 use hnsw_rs::hnsw::Neighbour;
 use hnsw_rs::prelude::{Hnsw, DistL2};
 use crate::SeqType;
-use crate::types::{Storage, FastaRecord, HnswSearchQuery, SequenceEmbedder, VectorDB, VectorDBConfig};
+use crate::types::{Storage, FastaRecord, HnswSearchQuery, SequenceEmbedder, HnswDB, HnswDBConfig};
 use crate::fileutils::parse_fasta;
 
 
-impl VectorDBConfig {
+impl HnswDBConfig {
     pub fn default(path: PathBuf, record_type: SeqType) -> Self {
         Self {
             path,
@@ -32,9 +32,10 @@ impl<'a> HnswSearchQuery<'a> {
     }
 }
 
-impl VectorDB {
+impl HnswDB {
 
-    pub fn open(config: VectorDBConfig, embedder: Box<dyn SequenceEmbedder>) -> Result<Self> {
+    /// Opens a new VectorDB, containing the embeddings of the sequences in the according sled database
+    pub fn open(config: HnswDBConfig, embedder: Box<dyn SequenceEmbedder>) -> Result<Self> {
         let sled_storage = Storage::open(&config.path)
             .context("failed to open sled storage")?;
         // make new hnsw db
@@ -58,7 +59,7 @@ impl VectorDB {
         Ok(db)
     }
 
-    pub fn open_fresh(config: VectorDBConfig, embedder: Box<dyn SequenceEmbedder>) -> Result<Self> {
+    pub fn open_fresh(config: HnswDBConfig, embedder: Box<dyn SequenceEmbedder>) -> Result<Self> {
         let sled_storage = Storage::open(&config.path)
             .context("failed to open sled storage")?;
         sled_storage.clear()?;

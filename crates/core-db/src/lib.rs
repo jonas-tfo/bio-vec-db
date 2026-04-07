@@ -1,7 +1,7 @@
 pub mod sequence_db;
-pub mod vector_db;
+pub mod hnsw_db;
 pub mod types;
 pub mod fileutils;
 pub mod constants;
 
-pub use types::{FastaRecord, SeqType, ModelSignature, VectorDB, VectorDBConfig, HnswSearchQuery, SequenceEmbedder};
+pub use types::{FastaRecord, SeqType, ModelSignature, HnswDB, HnswDBConfig, HnswSearchQuery, SequenceEmbedder};

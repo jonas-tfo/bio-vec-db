@@ -56,6 +56,6 @@ fn get_seq_type(line: &str) -> Result<SeqType> {
         (true, _, _) => Ok(SeqType::Dna),
         (_, true, _) => Ok(SeqType::Rna),
         (_, _, true) => Ok(SeqType::Protein),
-        _ => Err(Error::msg("Couldnt find seq type"))
+        _ => Err(Error::msg("Couldnt find record sequence type, will default to DNA"))
     }
 }

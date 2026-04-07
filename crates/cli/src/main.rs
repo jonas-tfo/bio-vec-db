@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand};
 use std::{path::PathBuf, time::Duration};
-use core_db::{HnswSearchQuery, SeqType, VectorDB, VectorDBConfig, types::str2seqtype};
+use core_db::{HnswSearchQuery, SeqType, HnswDB, HnswDBConfig, types::str2seqtype};
 use ml_models::python_embedder::PythonEmbedder;
 use indicatif::{ProgressBar, ProgressStyle};
 
@@ -68,27 +68,27 @@ fn main() {
     match args.command {
         Command::Build { fasta, db_path, record_type, fresh, model, dim } => {
             let seq_type = str2seqtype(&record_type).unwrap();
-            let conf = VectorDBConfig::default(PathBuf::from(&db_path), seq_type);
+            let conf = HnswDBConfig::default(PathBuf::from(&db_path), seq_type);
             let embedder = PythonEmbedder::new(
                 &PathBuf::from("scripts/embed_query.py"),
                 &model,
                 dim as usize
             );
             let mut db = match fresh {
-                true => VectorDB::open_fresh(conf, Box::new(embedder)).unwrap(),
-                false => VectorDB::open(conf, Box::new(embedder)).unwrap(),
+                true => HnswDB::open_fresh(conf, Box::new(embedder)).unwrap(),
+                false => HnswDB::open(conf, Box::new(embedder)).unwrap(),
             };
             let fast = PathBuf::from(&fasta);
             let spinner = ProgressBar::new_spinner();
             spinner.set_style(ProgressStyle::default_spinner().template("{spinner:.green} {msg}").unwrap());
             spinner.set_message(format!("Embedding sequences from {} ...", fasta));
             spinner.enable_steady_tick(Duration::from_millis(100));
-            VectorDB::rebuild_index_from_fasta_batch(&mut db, &fast).unwrap();
+            HnswDB::rebuild_index_from_fasta_batch(&mut db, &fast).unwrap();
             spinner.finish_with_message("Done.");
         },
         Command::Query { query, record_type, top_k, db_path, output, ef_construction, ef_search, model, dim } => {
             let seq_type = str2seqtype(&record_type).unwrap();
-            let conf = VectorDBConfig {
+            let conf = HnswDBConfig {
                 path: PathBuf::from(db_path),
                 ef_construction: ef_construction,
                 ef_search,
@@ -106,7 +106,7 @@ fn main() {
             spinner.set_style(ProgressStyle::default_spinner().template("{spinner:.green} {msg}").unwrap());
             spinner.set_message(format!("Embedding sled database sequences for rebuilding of vector data base..."));
             spinner.enable_steady_tick(Duration::from_millis(100));
-            let db = VectorDB::open(conf, embedder).unwrap();
+            let db = HnswDB::open(conf, embedder).unwrap();
             let query_bytes = query.into_bytes();
             let search_query = HnswSearchQuery {
                 data: &query_bytes,
