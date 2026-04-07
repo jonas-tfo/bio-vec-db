@@ -314,6 +314,7 @@ dependencies = [
  "clap",
  "core-db",
  "ml-models",
+ "serde_json",
 ]
 
 [[package]]
