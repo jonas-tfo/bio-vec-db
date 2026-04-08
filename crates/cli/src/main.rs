@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand};
 use std::{path::PathBuf, time::Duration};
-use core_db::{HnswSearchQuery, SeqType, HnswDB, HnswDBConfig, types::str2seqtype};
+use core_db::{HnswDB, HnswDBConfig, HnswSearchQuery, SeqType, types::str2seqtype};
 use ml_models::python_embedder::PythonEmbedder;
 use indicatif::{ProgressBar, ProgressStyle};
 
@@ -10,9 +10,12 @@ enum Command {
         /// fasta to build from
         #[arg(short, long)]
         fasta: String,
-        /// path to the database
-        #[arg(short, long, default_value = "data/db")]
-        db_path: String,
+        /// path to the sequence database
+        #[arg(short, long, default_value = "data/sequence_db")]
+        sequence_db_path: String,
+        /// path to the vector database
+        #[arg(short, long, default_value = "data/vector_db")]
+        vector_db_path: String,
         /// sequence type
         #[arg(short, long, default_value = "protein", value_parser = ["dna", "rna", "protein"])]
         record_type: String,
@@ -36,9 +39,12 @@ enum Command {
         /// number of nearest neighbours to return
         #[arg(short = 'k', long, default_value_t = 5)]
         top_k: usize,
-        /// path to the database
-        #[arg(short, long, default_value = "data/db")]
-        db_path: String,
+        /// path to the sequence database
+        #[arg(short, long, default_value = "data/sequence_db")]
+        sequence_db_path: String,
+        /// path to the vector database
+        #[arg(short, long, default_value = "data/vector_db")]
+        vector_db_path: String,
         /// output format: txt, json
         #[arg(short, long, default_value = "plain", value_parser = ["plain", "json"])]
         output: String,
@@ -66,9 +72,9 @@ enum Command {
 fn main() {
     let args = Args::parse();
     match args.command {
-        Command::Build { fasta, db_path, record_type, fresh, model, dim } => {
+        Command::Build { fasta, sequence_db_path, vector_db_path, record_type, fresh, model, dim } => {
             let seq_type = str2seqtype(&record_type).unwrap();
-            let conf = HnswDBConfig::default(PathBuf::from(&db_path), seq_type);
+            let conf = HnswDBConfig::default(PathBuf::from(&sequence_db_path), PathBuf::from(&vector_db_path), seq_type);
             let embedder = PythonEmbedder::new(
                 &PathBuf::from("scripts/embed_query.py"),
                 &model,
@@ -86,10 +92,11 @@ fn main() {
             HnswDB::rebuild_index_from_fasta_batch(&mut db, &fast).unwrap();
             spinner.finish_with_message("Done.");
         },
-        Command::Query { query, record_type, top_k, db_path, output, ef_construction, ef_search, model, dim } => {
+        Command::Query { query, record_type, top_k, sequence_db_path, vector_db_path, output, ef_construction, ef_search, model, dim } => {
             let seq_type = str2seqtype(&record_type).unwrap();
             let conf = HnswDBConfig {
-                path: PathBuf::from(db_path),
+                sequence_sled_data_path: PathBuf::from(&sequence_db_path),
+                vector_sled_data_path: PathBuf::from(&vector_db_path),
                 ef_construction: ef_construction,
                 ef_search,
                 max_nb_connection: 16,
@@ -104,7 +111,7 @@ fn main() {
             ));
             let spinner = ProgressBar::new_spinner();
             spinner.set_style(ProgressStyle::default_spinner().template("{spinner:.green} {msg}").unwrap());
-            spinner.set_message(format!("Embedding sled database sequences for rebuilding of vector data base..."));
+            spinner.set_message(format!("Rebuilding of Hnsw data base..."));
             spinner.enable_steady_tick(Duration::from_millis(100));
             let db = HnswDB::open(conf, embedder).unwrap();
             let query_bytes = query.into_bytes();
@@ -121,8 +128,8 @@ fn main() {
                     for n in neighbours {
                         let id: u64 = n.get_origin_id() as u64;
                         println!("id: {}, distance: {:.4}", n.d_id, n.distance);
-                        let sled_sequence = db.sled_storage.get(id, SeqType::Protein).unwrap();
-                        match sled_sequence {
+                        let sequence = db.sequence_db.get(id, seq_type).unwrap();
+                        match sequence {
                             Some(record) => {
                               println!(
                                   "Internal ID: {} -- distance: {:.4} -- seq: {}",
@@ -140,7 +147,7 @@ fn main() {
                   let output: Vec<serde_json::Value> = neighbours.iter()
                       .map(|n| {
                           let id = n.get_origin_id() as u64;
-                          let seq = db.sled_storage.get(id, SeqType::Protein).unwrap()
+                          let seq = db.sequence_db.get(id, SeqType::Protein).unwrap()
                               .map(|r| String::from_utf8_lossy(&r.sequence).into_owned());
                           serde_json::json!({
                               "id": n.d_id,
