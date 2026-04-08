@@ -1,9 +1,11 @@
-# bio-vec-db
+# simvek - semantic similarity search for amino acid sequences
 
-A vector database for amino acid sequences, using embeddings.
-Allows nearest-neighbour queries by storing vectors using a HSNW (Hierarchial Navigable Small World)
-Storage is backed by [sled](https://github.com/spacejam/sled).
-HNSW storage and nearest-neighbour search is backed by [hnsw_rs](https://github.com/jean-pierreBoth/hnswlib-rs).
+simvek embeds a given query sequence with a transformer model and finds the nearest neighbours in embedding space, returning semantically similar sequences without relying
+on traditional alignment methods like BLAST. \
+
+Vectors are indexed with [HNSW](https://github.com/jean-pierreBoth/hnswlib-rs) (Hierarchial Navigable Small World) for fast approximate search. \
+
+Both embeddings and sequences are persisted in [sled](https://github.com/spacejam/sled) key-value stores for fast retrieval.
 
 ## Architecture
 
@@ -76,9 +78,10 @@ Output formats: `plain` (default) or `json`.
 ## How does it work
 ```
 data/
-  sequence_db/   # sled tree: internal_id → FastaRecord
-  vector_db/     # sled tree: internal_id → embedding (f32 vec)
+  sequence_db/   # sled tree: internal_id -> FastaRecord
+  vector_db/     # sled tree: internal_id -> embedding (Vector of f32)
 ```
+**Note:** No half precision support yet
 
 ### Build
 1. The sequences from the fasta are saved in `sequence_db` and individual internal ids are assigned
