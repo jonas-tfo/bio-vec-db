@@ -131,12 +131,12 @@ fn main() {
                         let sequence = db.sequence_db.get(id, seq_type).unwrap();
                         match sequence {
                             Some(record) => {
-                              println!(
+                                println!(
                                   "Internal ID: {} -- distance: {:.4} -- seq: {}",
                                   n.get_origin_id(),
                                   n.get_distance(),
                                   String::from_utf8_lossy(&record.sequence)
-                              );
+                                );
                             }
                             _ => println!("Could not find sequence in sled, {} -- distance: {:.4}", id, n.get_distance())
                         };
@@ -144,20 +144,20 @@ fn main() {
                     }
                 },
                 "json" => {
-                  let output: Vec<serde_json::Value> = neighbours.iter()
-                      .map(|n| {
-                          let id = n.get_origin_id() as u64;
-                          let seq = db.sequence_db.get(id, SeqType::Protein).unwrap()
-                              .map(|r| String::from_utf8_lossy(&r.sequence).into_owned());
-                          serde_json::json!({
-                              "id": n.d_id,
-                              "distance": n.distance,
-                              "sequence": seq,
-                          })
-                      })
+                    let output: Vec<serde_json::Value> = neighbours.iter()
+                        .map(|n| {
+                            let id = n.get_origin_id() as u64;
+                            let seq = db.sequence_db.get(id, SeqType::Protein).unwrap()
+                                .map(|r| String::from_utf8_lossy(&r.sequence).into_owned());
+                            serde_json::json!({
+                                "id": n.d_id,
+                                "distance": n.distance,
+                                "sequence": seq,
+                            })
+                        })
                       .collect();
-                  println!("{}", serde_json::to_string_pretty(&output).unwrap());
-                },
+                    println!("{}", serde_json::to_string_pretty(&output).unwrap());
+                    },
                 _ => unreachable!()
             }
 
