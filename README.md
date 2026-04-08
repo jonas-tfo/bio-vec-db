@@ -1,9 +1,9 @@
 # simvek - semantic similarity search for amino acid sequences
 
 simvek embeds a given query sequence with a transformer model and finds the nearest neighbours in embedding space, returning semantically similar sequences without relying
-on traditional alignment methods like BLAST. \
+on traditional alignment methods like BLAST. 
 
-Vectors are indexed with [HNSW](https://github.com/jean-pierreBoth/hnswlib-rs) (Hierarchial Navigable Small World) for fast approximate search. \
+Vectors are indexed with [HNSW](https://github.com/jean-pierreBoth/hnswlib-rs) (Hierarchial Navigable Small World) for fast approximate search. 
 
 Both embeddings and sequences are persisted in [sled](https://github.com/spacejam/sled) key-value stores for fast retrieval.
 
