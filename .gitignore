@@ -1,2 +1,5 @@
+pyrightconfig.json
 /target
+/data
 /__pycache__
+
