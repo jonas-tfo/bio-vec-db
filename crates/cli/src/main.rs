@@ -132,7 +132,7 @@ fn main() {
                     final_seqtype = str2seqtype(&t).unwrap();
                 },
                 None => {
-                    eprint!("Warning: no sequence type was set, defaulting to protein");
+                    eprintln!("Warning: no sequence type was set, defaulting to protein");
                     final_seqtype = SeqType::Protein;
                 }
 
