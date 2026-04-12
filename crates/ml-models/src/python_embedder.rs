@@ -26,7 +26,8 @@ impl SequenceEmbedder for PythonEmbedder {
         let sequence_str = std::str::from_utf8(sequence)
             .context("sequence is not valid utf-8")?;
 
-        let output = Command::new("python3")
+        let output = Command::new("uv")
+            .arg("run")
             .arg(&self.script_path)
             .arg("--sequence").arg(sequence_str)
             .arg("--model").arg(&self.model_name)
