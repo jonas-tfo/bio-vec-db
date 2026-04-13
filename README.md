@@ -26,7 +26,6 @@ Embeddings and sequences are persisted in [sled](https://github.com/spacejam/sle
 - uv
 
 For setup, run `uv sync` and make python3 is in `$PATH`. This is needed for the embedding script.
-**Note:** the embedding script is called via a subprocess which assumes that your python binary can be run with the `python3` command.
 
 ## Usage
 
