@@ -84,12 +84,20 @@ def embed_sequence_bert_batch(sequences, tokenizer, encoder, device) -> list[lis
     return embeddings
 
 
+def detect_arch(model_name: str) -> str:
+    """Detect model architecture from model name."""
+    name_lower = model_name.lower()
+    if "t5" in name_lower:
+        return "t5"
+    return "bert"
+
+
 def main():
     parser = argparse.ArgumentParser(description="Embed a protein sequence")
     parser.add_argument("--sequence", default=None, help="amino acid sequence to embed")
     parser.add_argument("--fasta", default=None, help="fasta containing amino acid sequences to embed")
     parser.add_argument("--model",    default=None,  help="huggingface model name (overrides arch default)")
-    parser.add_argument("--arch",     default="bert", choices=["t5", "bert"], help="model architecture")
+    parser.add_argument("--arch",     default=None, choices=["t5", "bert"], help="model architecture (auto-detected from model name if omitted)")
     parser.add_argument("--device",   default=None,  help="cpu, cuda, or mps")
     args = parser.parse_args()
 
@@ -106,7 +114,15 @@ def main():
         print("error: provide --sequence or --fasta", file=sys.stderr)
         sys.exit(1)
 
-    if args.arch == "bert":
+    # auto-detect architecture from model name if --arch not explicitly set
+    if args.arch is not None:
+        arch = args.arch
+    elif args.model is not None:
+        arch = detect_arch(args.model)
+    else:
+        arch = "bert"
+
+    if arch == "bert":
         model_name = args.model or BERT_MODEL
         tokenizer  = BertTokenizer.from_pretrained(model_name, do_lower_case=False)
         encoder    = BertModel.from_pretrained(model_name)
@@ -119,7 +135,7 @@ def main():
             result = embed_sequence_bert(args.sequence, tokenizer, encoder, device)
     else:
         model_name = args.model or T5_MODEL
-        tokenizer  = T5Tokenizer.from_pretrained(model_name, do_lower_case=False)
+        tokenizer  = T5Tokenizer.from_pretrained(model_name, do_lower_case=False, use_fast=False)
         encoder    = T5EncoderModel.from_pretrained(model_name, torch_dtype=torch.float16)
         encoder.to(device)
         encoder.eval()
